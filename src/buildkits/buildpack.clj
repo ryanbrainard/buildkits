@@ -25,6 +25,7 @@
     (boolean member)))
 
 (defn s3-put [org buildpack-name content]
+  (prn :s3-put org buildpack-name (count content) (type content))
   (when-let [access_key (env/env :aws-access-key)]
     (let [s3 (RestS3Service. (AWSCredentials. access_key
                                               (env/env :aws-secret-key)))
@@ -138,3 +139,19 @@
   (DELETE "/buildpacks/:org/share/:email" {{:keys [org email]} :params
                                            headers :headers}
           (check-auth headers org unshare email)))
+
+;; This is intended to be run by hand to make the s3 contents match the DB
+(defn update-s3-tarballs []
+  (sql/with-connection db/db
+    (sql/with-query-results revisions
+      [(str "SELECT buildpacks.*, revisions.tarball"
+            " FROM buildpacks, revisions"
+            " WHERE revisions.buildpack_id = buildpacks.id"
+            " AND revisions.id IN "
+            " (SELECT MAX(revisions.id) FROM revisions"
+            "   GROUP BY buildpack_id);")]
+      (doseq [{:keys [tarball organization_id name id attributes]} revisions]
+        (sql/with-query-results [org] ["SELECT name FROM organizations WHERE id = ?"
+                                       organization_id]
+          (update (get attributes "owner") (:name org)
+                  {:name name :id id} tarball))))))
