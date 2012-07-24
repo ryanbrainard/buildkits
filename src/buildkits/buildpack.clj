@@ -50,7 +50,7 @@
 
 (defn update [username org buildpack content]
   (let [bytes (get-bytes content)
-        rev-id (db/update org (:id buildpack) bytes)]
+        rev-id (db/update username (:id buildpack) bytes)]
     (s3-put org (:name buildpack) bytes)
     {:status 200 :body (json/encode {:revision rev-id})}))
 
