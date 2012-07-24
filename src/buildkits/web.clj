@@ -24,7 +24,8 @@
       (:body) (json/decode true) :access_token))
 
 (defn get-username [token]
-  (-> (http/get (str "https://api.heroku.com/user?bearer_token=" token))
+  (-> (http/get "https://api.heroku.com/user"
+                {:headers {"Authorization" (str "Bearer " token)}})
       (:body) (json/decode true) :email))
 
 (defroutes app
