@@ -4,6 +4,7 @@
             [ring.middleware.resource :as resource]
             [ring.middleware.stacktrace :as trace]
             [ring.util.response :as res]
+            [noir.util.middleware :as noir]
             [environ.core :as env]
             [clj-http.client :as http]
             [cheshire.core :as json]
@@ -69,12 +70,14 @@
   (route/not-found "Not found"))
 
 (defn -main [& [port]]
-  (let [port (Integer. (or port (env/env :port)))
+  (let [port (Integer. (or port (env/env :port) 5000))
         store (cookie/cookie-store {:key (env/env :session-secret)})]
     (jetty/run-jetty (-> #'app
                          (resource/wrap-resource "static")
-                         ;; (trace/wrap-stacktrace)
+                         ((if (env/env :dev)
+                            trace/wrap-stacktrace
+                            noir/wrap-force-ssl))
                          (handler/site {:session {:store store}}))
                      {:port port :join? false})))
 
-;; (def s (-main 8080))
+;; (def s (-main 5000))
