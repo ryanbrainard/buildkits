@@ -29,7 +29,7 @@
   (when-let [access_key (env/env :aws-access-key)]
     (let [s3 (RestS3Service. (AWSCredentials. access_key
                                               (env/env :aws-secret-key)))
-          bucket (or (System/getenv "AWS_BUCKET") "buildkits-dev")
+          bucket (env/env :aws-bucket)
           key (format "buildpacks/%s/%s.tgz" org buildpack-name)
           obj (doto (S3Object. key content)
                 (.setAcl (AccessControlList/REST_CANNED_PUBLIC_READ)))]
