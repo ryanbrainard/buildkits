@@ -69,11 +69,21 @@
        (buildpack/app req))
   (route/not-found "Not found"))
 
+(defn wrap-validation-exception [handler]
+  (fn [req]
+    (try
+      (handler req)
+      (catch clojure.lang.ExceptionInfo e
+        {:status (:status (ex-data e) 400)
+         :headers {"Content-Type" "application/json"}
+         :body (json/encode (assoc (ex-data e) :message (.getMessage e)))}))))
+
 (defn -main [& [port]]
   (let [port (Integer. (or port (env/env :port) 5000))
         store (cookie/cookie-store {:key (env/env :session-secret)})]
     (jetty/run-jetty (-> #'app
                          (resource/wrap-resource "static")
+                         (wrap-validation-exception)
                          ((if (env/env :dev)
                             trace/wrap-stacktrace
                             noir/wrap-force-ssl))
@@ -81,3 +91,4 @@
                      {:port port :join? false})))
 
 ;; (def s (-main 5000))
+;; (.stop s)

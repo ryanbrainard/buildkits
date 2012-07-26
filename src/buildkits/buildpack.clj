@@ -79,6 +79,8 @@
   (sql/with-query-results [{:keys [id]}]
     ["SELECT * FROM organizations WHERE name = ?" org]
     ;; TODO: ensure user exists
+    (when-not (re-find #"@" email)
+      (throw (ex-info "Invalid email" {:email email})))
     (sql/with-query-results [member] [(str "SELECT * FROM memberships WHERE"
                                            " email = ? AND organization_id = ?")
                                       email id]
