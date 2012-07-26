@@ -21,18 +21,24 @@
             [[:input (h/attr= :name "_method")]] (h/set-attr "value" method)
             [[:input (h/attr= :type "submit")]] (h/set-attr "value" label)))))
 
+(defn tar-link [{:keys [org name]}]
+  (format "http://%s.s3.amazonaws.com/buildpacks/%s/%s.tgz"
+          (env/env :aws-bucket) org name))
+
 (defn buildpack-list [buildpacks kit]
   (h/clone-for [buildpack buildpacks]
                (fn [li]
                  (h/at li
-                       [:h4] (h/content (:name buildpack))
+                       [:h4] (h/content (str (:org buildpack) "/" (:name buildpack)))
                        [:form] (if kit
                                  (h/do->
                                   (h/add-class "logged-in")
-                                  (h/set-attr "action" (format "/buildkit/%s/0"
+                                  (h/set-attr "action" (format "/buildkit/%s/%s/0"
+                                                               (:org buildpack)
                                                                (:name buildpack)))
                                   (toggle-form buildpack kit)))
-                       [:p.owner] (h/content (str "By " (:owner buildpack)))))))
+                       [:a.tgz] (h/set-attr "href" (tar-link buildpack))
+                       [:span.owner] (h/content (:owner buildpack))))))
 
 (h/deftemplate dashboard "index.html" [buildpacks username kit]
   [:p#login :a] (login-link username)

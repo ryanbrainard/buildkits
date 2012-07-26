@@ -29,14 +29,6 @@
 
 </head>
 <body>
-
-
-
-	<!-- Primary Page Layout
-	================================================== -->
-
-	<!-- Delete everything in this .container and get started on your own site! -->
-
 	<div class="container">
 		<div class="sixteen columns">
 			<h1 class="remove-bottom eight columns"
@@ -47,11 +39,13 @@
 		</div>
 		<div class="two-thirds column">
 		  <ul id="buildpacks">
-            <li><h4>clojure</h4>
+            <li>
+              <h4>heroku/clojure</h4>
               <form action="/buildkit/clojure-lein2/0" method="POST">
                 <input name="_method" type="hidden" value="PUT">
                 <input type="submit" value="add"></form>
-              <p class="owner">By phil.hagelberg@heroku.com</p></li>
+              <p>By <span class="owner">phil.hagelberg@heroku.com</span>
+              [<a class="tgz" href="">tgz</a>]</p></li>
           </ul>
 		</div>
 		<div class="one-third column explaination">
@@ -61,15 +55,12 @@
 				<li>Each buildpack with a matching <code>bin/detect</code>
 				  script will be activated.</li>
                 <li>Publish new buildpacks with
-                  the <a href="https://github.com/ddollar/heroku-buildpacks">heroku-buildpacks</a>
+                  the <a href="https://github.com/heroku/heroku-buildpacks">heroku-buildpacks</a>
                   plugin.</li>
                 <li id="yours"><a id="kit" href="">Your Build Kit</a> can be
                   used with <a href="https://github.com/ddollar/anvil">Anvil</a>.</li>
 			</ul>
 		</div>
 	</div><!-- container -->
-
-<!-- End Document
-================================================== -->
 </body>
 </html>

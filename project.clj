@@ -7,6 +7,7 @@
                  [compojure "1.1.0"]
                  [ring/ring-jetty-adapter "1.1.0"]
                  [ring/ring-devel "1.1.0"]
+                 [lib-noir "0.2.0-alpha2"]
                  [cheshire "4.0.0"]
                  [clj-http "0.4.2"]
                  [enlive "1.0.1"]
