@@ -20,12 +20,23 @@
 
 (defn org-member? [username org]
   (sql/with-query-results [member] [(str "SELECT * FROM memberships, organizations "
-                                         "WHERE email = ? AND organizations.name = ?")
+                                         "WHERE email = ? AND organizations.name = ?"
+                                         " AND organization_id = organizations.id")
                                     username org]
     (boolean member)))
 
+(defn org-exists? [org]
+  (sql/with-query-results [o] ["SELECT * FROM organizations WHERE name = ?" org]
+    (boolean o)))
+
+(defn create-org [org username]
+  (when-not (re-find #"^[-\w]+$" org)
+    (throw (ex-info "Org names must contain only alphanumerics and dashes."
+                    {:org org})))
+  (let [{:keys [id]} (sql/insert-record "organizations" {:name org})]
+    (sql/insert-record "memberships" {:email username :organization_id id})))
+
 (defn s3-put [org buildpack-name content]
-  (prn :s3-put org buildpack-name (count content) (type content))
   (when-let [access_key (env/env :aws-access-key)]
     (let [s3 (RestS3Service. (AWSCredentials. access_key
                                               (env/env :aws-secret-key)))
@@ -109,7 +120,11 @@
         (if (check-api-key username key)
           (if (org-member? username org)
             (apply callback username org args)
-            {:status 403})
+            (sql/transaction
+             (if (org-exists? org)
+               {:status 403}
+               (do (create-org org username)
+                   (apply callback username org args)))))
           {:status 401})))
     {:status 401}))
 
