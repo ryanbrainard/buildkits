@@ -90,43 +90,46 @@
   (sql/with-query-results [{:keys [id]}]
     ["SELECT * FROM organizations WHERE name = ?" org]
     ;; TODO: ensure user exists
-    (when-not (re-find #"@" email)
+    (when-not (re-find #".@.+\..+$" email)
       (throw (ex-info "Invalid email" {:email email})))
     (sql/with-query-results [member] [(str "SELECT * FROM memberships WHERE"
                                            " email = ? AND organization_id = ?")
                                       email id]
-      (if member
-        {:status 409}
-        (do (sql/insert-record "memberships" {:email email :organization_id id})
-            {:status 201})))))
+      (when member
+        (throw (ex-info "Already shared" {:status 409})))
+      (sql/insert-record "memberships" {:email email :organization_id id})
+      {:status 201})))
 
 (defn unshare [_ org email]
   (sql/with-query-results [membership]
     [(str "SELECT * FROM memberships, organizations WHERE email = ? AND"
           " organization_id = organizations.id AND organizations.name = ?")
      email org]
-    (if membership
-      (do (sql/delete-rows "memberships" ["id = ?" (:id membership)])
-          {:status 200})
-      {:status 404})))
+    (when-not membership
+      (throw (ex-info "Not a member" {:status 404})))
+    (sql/delete-rows "memberships" ["id = ?" (:id membership)])
+    {:status 200}))
 
 (def ^:dynamic *not-found* (constantly {:status 404}))
 
 (defn check-auth [headers org callback & args]
-  (if-let [authorization (get headers "authorization")]
-    (let [[username key] (-> authorization (.split " ") second
-                             .getBytes base64/decode String. (.split ":"))]
-      (sql/with-connection db/db
-        (if (check-api-key username key)
-          (if (org-member? username org)
-            (apply callback username org args)
-            (sql/transaction
-             (if (org-exists? org)
-               {:status 403}
-               (do (create-org org username)
-                   (apply callback username org args)))))
-          {:status 401})))
-    {:status 401}))
+  (let [authorization (or (get headers "authorization")
+                          (throw (ex-info "Unauthorized" {:status 401})))
+        [username key] (-> authorization (.split " ") second
+                           .getBytes base64/decode String. (.split ":"))]
+    (when-not (check-api-key username key)
+      (throw (ex-info "Forbidden" {:status 401})))
+    (sql/with-connection db/db
+      (prn :member? username org (org-member? username org))
+      (if (org-member? username org)
+        (apply callback username org args)
+        (sql/transaction
+         (prn :exists? org (org-exists? org))
+         (when (org-exists? org)
+           (throw (ex-info "Not a member of that organization."
+                           {:status 403 :org org})))
+         (create-org org username)
+         (apply callback username org args))))))
 
 (defn check-pack-auth [headers org buildpack-name callback & args]
   (let [pack-callback (fn [username org & args]
