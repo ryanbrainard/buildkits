@@ -32,7 +32,9 @@
 (defn get-buildpacks []
   (sql/with-query-results buildpacks
     [(str "SELECT buildpacks.*, organizations.name as org"
-          " FROM buildpacks, organizations ORDER BY name")]
+          " FROM buildpacks, organizations"
+          " WHERE buildpacks.organization_id = organizations.id"
+          " ORDER BY name")]
     (mapv (comp flatten unhstore) buildpacks)))
 
 (defn get-kit [name]
