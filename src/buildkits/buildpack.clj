@@ -43,7 +43,7 @@
       (.delete input))
     (.toByteArray baos)))
 
-(defn create [username org buildpack-name content]
+(defn create [buildpack-name username org content]
   (let [bytes (get-bytes content)
         rev-id (db/create username org buildpack-name bytes)]
     (s3-put org buildpack-name bytes)
@@ -128,7 +128,7 @@
        (check-pack-auth headers org name revisions))
   (POST "/buildpacks/:org/:name" {{:keys [org name buildpack]} :params
                                   headers :headers}
-        (binding [*not-found* create]
+        (binding [*not-found* (partial create name)]
           (check-pack-auth headers org name update (:tempfile buildpack))))
   (POST "/buildpacks/:org/:name/revisions/:target"
         {{:keys [org name target]} :params headers :headers}
