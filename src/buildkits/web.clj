@@ -79,7 +79,7 @@
             (db/remove-from-kit username org buildpack))
           (res/redirect "/"))
   (wrap-auth buildpack/app)
-  ;; (wrap-auth kit/app)
+  (wrap-auth kit/app)
   (route/not-found "Not found"))
 
 (defn wrap-validation-exception [handler]

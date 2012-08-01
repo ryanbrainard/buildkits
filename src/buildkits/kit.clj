@@ -2,7 +2,13 @@
   (:refer-clojure :exclude [delete remove])
   (:require [clojure.java.shell :as sh]
             [clojure.java.io :as io]
-            [environ.core :as env])
+            [clojure.java.jdbc :as sql]
+            [environ.core :as env]
+            [cheshire.core :as json]
+            ;; since I don't want to create a new ns for a single defn
+            [buildkits.buildpack :refer [wrap-auth]]
+            [buildkits.db :as db]
+            [compojure.core :refer [defroutes GET PUT POST DELETE ANY]])
   (:import (java.io BufferedOutputStream BufferedInputStream
                     ByteArrayInputStream File FileOutputStream)
            (org.apache.commons.compress.archivers.tar TarArchiveOutputStream
@@ -62,3 +68,16 @@
       (io/copy (.openStream (io/resource script)) (io/file base-path script))
       (.setExecutable (io/file base-path script) true))
     (tgz-dir base-path (File/createTempFile name ".tgz"))))
+
+(defroutes app
+  (GET "/buildkit" {{:keys [username]} :params}
+       {:status 200 :body (json/encode (or (db/get-kit username)
+                                           (db/create-kit username)))})
+  (PUT "/buildkit/:org/:buildpack" {{:keys [username org buildpack]} :params}
+       (sql/with-connection db/db
+         (db/add-to-kit username org buildpack 0)
+         {:status 200}))
+  (DELETE "/buildkit/:org/:buildpack" {{:keys [username org buildpack]} :params}
+          (sql/with-connection db/db
+            (db/remove-from-kit username org buildpack))
+          {:stauts 200}))
