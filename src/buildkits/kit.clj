@@ -5,8 +5,6 @@
             [clojure.java.jdbc :as sql]
             [environ.core :as env]
             [cheshire.core :as json]
-            ;; since I don't want to create a new ns for a single defn
-            [buildkits.buildpack :refer [wrap-auth]]
             [buildkits.db :as db]
             [compojure.core :refer [defroutes GET PUT POST DELETE ANY]])
   (:import (java.io BufferedOutputStream BufferedInputStream
@@ -83,8 +81,11 @@
               (catch Exception _
                 {:status 404}))))
   (DELETE "/buildkit/:org/:buildpack" {{:keys [username org buildpack]} :params}
-          (if (db/get-buildpack org buildpack)
-            (sql/with-connection db/db
-              (db/remove-from-kit username org buildpack))
-            {:status 404})
-          {:stauts 200}))
+          (sql/with-connection db/db
+            (if (db/get-buildpack org buildpack)
+              (let [[removed] (db/remove-from-kit username org buildpack)]
+                (prn :removed removed)
+                (if (pos? removed)
+                  {:stauts 200}
+                  {:status 404}))
+              {:status 404}))))

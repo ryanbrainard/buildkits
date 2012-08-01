@@ -53,16 +53,19 @@
         (mapv (comp flatten unhstore) buildpacks)))))
 
 (defn add-to-kit [username org buildpack-name position]
-  (let [{:keys [id]} (get-buildpack org buildpack-name)]
+  (if-let [{:keys [id]} (get-buildpack org buildpack-name)]
     (sql/insert-record :kits {:kit username :buildpack_id id
-                              :position position})))
+                              :position position})
+    (throw (ex-info "Bulidpack not found" {:buildpack buildpack-name}))))
 
 (def defaults ["clojure" "gradle" "grails" "java" "logo" "nodejs" "php"
                "play" "python" "ruby" "scala"])
 
 (defn create-kit [name]
   (doseq [buildpack defaults]
-    (add-to-kit name "heroku" buildpack 0))
+    (try (add-to-kit name "heroku" buildpack 0)
+         (catch clojure.lang.ExceptionInfo _
+           (println "WARNING: creating kit and missing" buildpack))))
   (get-kit name))
 
 (defn remove-from-kit [kit org buildpack-name]
