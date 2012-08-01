@@ -65,8 +65,7 @@
                   (db/remove-from-kit username org buildpack))
                 (res/redirect "/"))
             {:stauts 403}))
-  (ANY "/*" {:as req}
-       (buildpack/app req))
+  buildpack/app
   (route/not-found "Not found"))
 
 (defn wrap-validation-exception [handler]
