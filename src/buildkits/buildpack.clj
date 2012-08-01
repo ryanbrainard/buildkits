@@ -3,7 +3,6 @@
             [clojure.java.io :as io]
             [clojure.java.jdbc :as sql]
             [cheshire.core :as json]
-            [clojure.data.codec.base64 :as base64]
             [environ.core :as env]
             [compojure.core :refer [defroutes GET PUT POST DELETE ANY]])
   (:import (org.jets3t.service.security AWSCredentials)
@@ -12,11 +11,6 @@
            (org.jets3t.service.acl.gs AllUsersGrantee)
            (org.jets3t.service.acl Permission)
            (org.jets3t.service.model S3Object)))
-
-;; for actions coming from the heroku-buildpacks plugin
-(defn check-api-key [username key]
-  (try (= username (.getEmail (.getUserInfo (com.heroku.api.HerokuAPI. key))))
-       (catch com.heroku.api.exception.RequestFailedException _)))
 
 (defn org-member? [username org]
   (sql/with-query-results [member] [(str "SELECT * FROM memberships, organizations "
@@ -112,53 +106,41 @@
 
 (def ^:dynamic *not-found* (constantly {:status 404}))
 
-(defn check-auth [headers org callback & args]
-  (let [authorization (or (get headers "authorization")
-                          (throw (ex-info "Unauthorized" {:status 401})))
-        [username key] (-> authorization (.split " ") second
-                           .getBytes base64/decode String. (.split ":"))]
-    (when-not (check-api-key username key)
-      (throw (ex-info "Forbidden" {:status 401})))
-    (sql/with-connection db/db
-      (prn :member? username org (org-member? username org))
-      (if (org-member? username org)
-        (apply callback username org args)
-        (sql/transaction
-         (prn :exists? org (org-exists? org))
-         (when (org-exists? org)
-           (throw (ex-info "Not a member of that organization."
-                           {:status 403 :org org})))
-         (create-org org username)
-         (apply callback username org args))))))
+(defn check-org [username org callback & args]
+  (sql/with-connection db/db
+    (if (org-member? username org)
+      (apply callback username org args)
+      (sql/transaction
+       (when (org-exists? org)
+         (throw (ex-info "Not a member of that organization."
+                         {:status 403 :org org})))
+       (create-org org username)
+       (apply callback username org args)))))
 
-(defn check-pack-auth [headers org buildpack-name callback & args]
+(defn check-pack [username org buildpack-name callback & args]
   (let [pack-callback (fn [username org & args]
                         (if-let [pack (db/get-buildpack org buildpack-name)]
                           (apply callback username org pack args)
                           (apply *not-found* username org args)))]
-    (apply check-auth headers org pack-callback args)))
+    (apply check-org username org pack-callback args)))
 
 (defroutes app
   (GET "/buildpacks" []
        {:status 200 :headers {"content-type" "application/json"}
         :body (sql/with-connection db/db
                 (json/encode (db/get-buildpacks)))})
-  (GET "/buildpacks/:org/:name/revisions" {{:keys [org name]} :params
-                                           headers :headers}
-       (check-pack-auth headers org name revisions))
-  (POST "/buildpacks/:org/:name" {{:keys [org name buildpack]} :params
-                                  headers :headers}
+  (GET "/buildpacks/:org/:name/revisions" {{:keys [username org name]} :params}
+       (check-pack username org name revisions))
+  (POST "/buildpacks/:org/:name" {{:keys [username org name buildpack]} :params}
         (binding [*not-found* (partial create name)]
-          (check-pack-auth headers org name update (:tempfile buildpack))))
-  (POST "/buildpacks/:org/:name/revisions/:target"
-        {{:keys [org name target]} :params headers :headers}
-        (check-pack-auth headers org name rollback target))
-  (POST "/buildpacks/:org/share/:email" {{:keys [org email]} :params
-                                         headers :headers}
-        (check-auth headers org share email))
-  (DELETE "/buildpacks/:org/share/:email" {{:keys [org email]} :params
-                                           headers :headers}
-          (check-auth headers org unshare email)))
+          (check-pack username org name update (:tempfile buildpack))))
+  (POST "/buildpacks/:org/:name/revisions/:target" {{:keys [username org name
+                                                            target]} :params}
+        (check-pack username org name rollback target))
+  (POST "/buildpacks/:org/share/:email" {{:keys [username org email]} :params}
+        (check-org username org share email))
+  (DELETE "/buildpacks/:org/share/:email" {{:keys [username org email]} :params}
+          (check-org username org unshare email)))
 
 ;; This is intended to be run by hand to make the s3 contents match the DB
 (defn update-s3-tarballs []

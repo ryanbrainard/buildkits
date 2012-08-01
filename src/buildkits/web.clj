@@ -12,10 +12,24 @@
             [compojure.route :as route]
             [compojure.handler :as handler]
             [clojure.java.jdbc :as sql]
+            [clojure.data.codec.base64 :as base64]
             [buildkits.db :as db]
             [buildkits.html :as html]
             [buildkits.kit :as kit]
             [buildkits.buildpack :as buildpack]))
+
+;; for operations coming from the CLI client
+(defn wrap-auth [handler]
+  (fn [{:keys [headers params] :as req}]
+    (let [authorization (or (get headers "authorization")
+                            (throw (ex-info "Unauthorized" {:status 401})))
+          [username key] (-> authorization (.split " ") second
+                             .getBytes base64/decode String. (.split ":"))]
+      (when-not (try (= username (-> (com.heroku.api.HerokuAPI. key)
+                                     (.getUserInfo) (.getEmail)))
+                     (catch com.heroku.api.exception.RequestFailedException _))
+        (throw (ex-info "Forbidden" {:status 401})))
+      (handler (update-in req [:params] assoc :username username)))))
 
 (defn get-token [code]
   (-> (http/post "https://api.heroku.com/oauth/token"
@@ -50,22 +64,22 @@
          {:status 403}))
   (GET "/logout" []
        (assoc (res/redirect "/") :session nil))
-  ;; TODO: use compojure contexts to enforce login
   (PUT "/buildkit/:org/:buildpack/:pos" [org buildpack pos :as
                                          {{:keys [username]} :session}]
-       (if username
-         (do (sql/with-connection db/db
-               (db/add-to-kit username org buildpack (Integer. pos)))
-             (res/redirect "/"))
-         {:status 403}))
+       (when-not username
+         (throw (ex-info "Must log in" {:status 403})))
+       (sql/with-connection db/db
+         (db/add-to-kit username org buildpack (Integer. pos)))
+       (res/redirect "/"))
   (DELETE "/buildkit/:org/:buildpack/:pos" [org buildpack :as
                                             {{:keys [username]} :session}]
-          (if username
-            (do (sql/with-connection db/db
-                  (db/remove-from-kit username org buildpack))
-                (res/redirect "/"))
-            {:stauts 403}))
-  buildpack/app
+          (when-not username
+            (throw (ex-info "Must log in" {:status 403})))
+          (sql/with-connection db/db
+            (db/remove-from-kit username org buildpack))
+          (res/redirect "/"))
+  (wrap-auth buildpack/app)
+  ;; (wrap-auth kit/app)
   (route/not-found "Not found"))
 
 (defn wrap-validation-exception [handler]
@@ -89,5 +103,5 @@
                          (handler/site {:session {:store store}}))
                      {:port port :join? false})))
 
-;; (def s (-main 5000))
 ;; (.stop s)
+;; (def s (-main 5000))
