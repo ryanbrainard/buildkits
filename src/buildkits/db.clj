@@ -40,11 +40,12 @@
 (defn get-kit [name]
   (if name
     (sql/with-query-results buildpacks
-      [(str "SELECT buildpacks.*, revisions.tarball"
-            " FROM buildpacks, revisions, kits"
+      [(str "SELECT buildpacks.*, revisions.tarball, organizations.name as org"
+            " FROM buildpacks, revisions, kits, organizations"
             " WHERE revisions.buildpack_id = buildpacks.id"
             " AND kits.kit = ?"
             " AND buildpacks.id = kits.buildpack_id"
+            " AND buildpacks.organization_id = organizations.id"
             " AND revisions.created_at IN "
             " (SELECT MAX(revisions.created_at) FROM revisions"
             "   GROUP BY buildpack_id);") name]
