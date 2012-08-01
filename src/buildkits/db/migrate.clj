@@ -56,7 +56,7 @@
                      "ALTER TABLE buildpacks ALTER COLUMN id SET NOT NULL"
                      "ALTER SEQUENCE buildpacks_id_seq OWNED BY buildpacks.id")
     (sql/with-query-results _ ["SELECT setval('buildpacks_id_seq', ?)"
-                               (count packs)])))
+                               (inc (count packs))])))
 
 (defn add-orgs []
   (sql/create-table "organizations"
