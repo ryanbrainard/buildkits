@@ -71,13 +71,20 @@
 
 (defroutes app
   (GET "/buildkit" {{:keys [username]} :params}
-       {:status 200 :body (json/encode (or (db/get-kit username)
-                                           (db/create-kit username)))})
+       {:status 200
+        :body (sql/with-connection db/db
+                (json/encode (for [pack (or (db/get-kit username)
+                                            (db/create-kit username))]
+                               (dissoc pack :owner :tarball :id))))})
   (PUT "/buildkit/:org/:buildpack" {{:keys [username org buildpack]} :params}
        (sql/with-connection db/db
-         (db/add-to-kit username org buildpack 0)
-         {:status 200}))
+         (try (db/add-to-kit username org buildpack 0)
+              {:status 200}
+              (catch Exception _
+                {:status 404}))))
   (DELETE "/buildkit/:org/:buildpack" {{:keys [username org buildpack]} :params}
-          (sql/with-connection db/db
-            (db/remove-from-kit username org buildpack))
+          (if (db/get-buildpack org buildpack)
+            (sql/with-connection db/db
+              (db/remove-from-kit username org buildpack))
+            {:status 404})
           {:stauts 200}))
