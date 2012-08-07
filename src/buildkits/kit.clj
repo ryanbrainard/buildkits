@@ -62,7 +62,7 @@
     (doseq [buildpack kit]
       (extract buildpack base-path))
     (.mkdirs (io/file base-path "bin"))
-    (doseq [script ["bin/detect" "bin/compile" "bin/release"]]
+    (doseq [script ["bin/detect" "bin/compile" "bin/release" "bin/procfile" "bin/profiled"]]
       (io/copy (.openStream (io/resource script)) (io/file base-path script))
       (.setExecutable (io/file base-path script) true))
     (tgz-dir base-path (File/createTempFile name ".tgz"))))
