@@ -24,11 +24,9 @@ cat $detected_buildpacks | while read buildpack_and_name; do
 
   # if profile.d has not been written, let's generate one from bin/release
   # to work around old buildpacks
-  #if [ "$profiled_scan_old" == "$profiled_scan_new" ]; then
-  if [ "" == "" ]; then
+  if [ "$profiled_scan_old" == "$profiled_scan_new" ]; then
     if [ -x $buildpack/bin/release ]; then
       mkdir -p $compile_dir/.profile.d
-      echo "woop"
       $buildpack/bin/release $compile_dir | $root_dir/bin/profiled > $compile_dir/.profile.d/$shortname.sh
     fi
   fi
