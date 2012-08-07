@@ -3,6 +3,7 @@
 compile_dir=$1
 cache_dir=$2
 
+root_dir="$(dirname $(dirname $0))"
 buildpacks_dir="$(dirname $0)/../buildpacks"
 detected_buildpacks="$1/.detected_buildpacks"
 
@@ -23,35 +24,16 @@ cat $detected_buildpacks | while read buildpack_and_name; do
 
   # if profile.d has not been written, let's generate one from bin/release
   # to work around old buildpacks
-  if [ "$profiled_scan_old" == "$profiled_scan_new" ]; then
+  #if [ "$profiled_scan_old" == "$profiled_scan_new" ]; then
+  if [ "" == "" ]; then
     if [ -x $buildpack/bin/release ]; then
       mkdir -p $compile_dir/.profile.d
-
-      # read config_vars from yaml and create a profile.d
-      # script instead. special-case handling for PATH
-      # used to inject $HOME in the right places
-      $buildpack/bin/release $compile_dir | \
-        ruby -ryaml -e "
-          release = YAML.load(STDIN.read)  || {}
-          vars    = release['config_vars'] || {}
-
-          vars.each do |key, value|
-            if key == 'PATH'
-              # add HOME to relative PATHs
-              value = value.split(':').map do |part|
-                case part[0..0]
-                  when '/' then part
-                  else \"\$HOME/#{part}\"
-                end
-              end.join(':')
-
-              puts %{export #{key}=\"#{value}\"}
-            else
-              puts %{export #{key}=\${#{key}:-#{value}}}
-            end
-          end
-        " >> $compile_dir/.profile.d/$shortname.sh
+      echo "woop"
+      $buildpack/bin/release $compile_dir | $root_dir/bin/profiled > $compile_dir/.profile.d/$shortname.sh
     fi
   fi
+
+  # append bin/release process types to Procfile
+  $buildpack/bin/release $compile_dir | $root_dir/bin/procfile $compile_dir/Procfile
 
 done
