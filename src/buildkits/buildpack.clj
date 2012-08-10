@@ -55,6 +55,7 @@
     {:status 201 :body (json/encode {:revision rev-id})}))
 
 (defn update [username org buildpack content]
+  (println "Updating" org buildpack "by" username)
   (let [bytes (get-bytes content)
         rev-id (db/update username (:id buildpack) bytes)]
     (s3-put org (:name buildpack) bytes)
