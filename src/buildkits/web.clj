@@ -17,6 +17,7 @@
             [buildkits.db :as db]
             [buildkits.html :as html]
             [buildkits.kit :as kit]
+            [buildkits.log :as log]
             [buildkits.buildpack :as buildpack]))
 
 ;; for operations coming from the CLI client
@@ -52,6 +53,7 @@
                                   (or (db/get-kit username)
                                       (db/create-kit username)))))})
   (GET "/buildkit/:name.tgz" [name]
+       (log/info :download name)
        (sql/with-connection db/db
          (if-let [kit (db/get-kit name)]
            {:status 200
@@ -60,16 +62,20 @@
            {:status 404})))
   (GET "/oauth" [code]
        (if code
-         (assoc (res/redirect "/")
-           :session {:username (get-username (get-token code))})
+         (let [username (get-username (get-token code))]
+           (log/info :login username)
+           (assoc (res/redirect "/")
+             :session {:username username}))
          {:status 403}))
-  (GET "/logout" []
+  (GET "/logout" {{username :username} :session}
+       (log/info :logout username)
        (assoc (res/redirect "/") :session nil))
   (PUT "/buildkit/:org/:buildpack/:pos" [org buildpack pos :as
                                          {{:keys [username]} :session}]
        (when-not username
          (throw (ex-info "Must log in" {:status 403})))
        (sql/with-connection db/db
+         (log/info :add-to-kit (str org "/" buildpack) :username username)
          (db/add-to-kit username org buildpack (Integer. pos)))
        (res/redirect "/"))
   (DELETE "/buildkit/:org/:buildpack/:pos" [org buildpack :as
@@ -77,6 +83,7 @@
           (when-not username
             (throw (ex-info "Must log in" {:status 403})))
           (sql/with-connection db/db
+            (log/info :remove-from-kit (str org "/" buildpack) :username username)
             (db/remove-from-kit username org buildpack))
           (res/redirect "/"))
   (wrap-auth #'buildpack/app)

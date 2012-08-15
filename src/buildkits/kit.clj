@@ -6,6 +6,7 @@
             [environ.core :as env]
             [cheshire.core :as json]
             [buildkits.db :as db]
+            [buildkits.log :as log]
             [compojure.core :refer [defroutes GET PUT POST DELETE ANY]])
   (:import (java.io BufferedOutputStream BufferedInputStream
                     ByteArrayInputStream File FileOutputStream)
@@ -69,6 +70,7 @@
 
 (defroutes app
   (GET "/buildkit" {{:keys [username]} :params}
+       (log/info :show-kit username)
        {:status 200
         :body (sql/with-connection db/db
                 (json/encode (for [pack (or (db/get-kit username)
@@ -76,15 +78,16 @@
                                (dissoc pack :owner :tarball :id))))})
   (PUT "/buildkit/:org/:buildpack" {{:keys [username org buildpack]} :params}
        (sql/with-connection db/db
+         (log/info :add-to-kit (str org "/" buildpack) :username username)
          (try (db/add-to-kit username org buildpack 0)
               {:status 200}
               (catch Exception _
                 {:status 404}))))
   (DELETE "/buildkit/:org/:buildpack" {{:keys [username org buildpack]} :params}
           (sql/with-connection db/db
+            (log/info :remove-from-kit (str org "/" buildpack) :username username)
             (if (db/get-buildpack org buildpack)
               (let [[removed] (db/remove-from-kit username org buildpack)]
-                (prn :removed removed)
                 (if (pos? removed)
                   {:stauts 200}
                   {:status 404}))

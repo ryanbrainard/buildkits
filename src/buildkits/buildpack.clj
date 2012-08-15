@@ -1,5 +1,6 @@
 (ns buildkits.buildpack
   (:require [buildkits.db :as db]
+            [buildkits.log :as log]
             [clojure.java.io :as io]
             [clojure.java.jdbc :as sql]
             [cheshire.core :as json]
@@ -131,16 +132,21 @@
         :body (sql/with-connection db/db
                 (json/encode (db/get-buildpacks)))})
   (GET "/buildpacks/:org/:name/revisions" {{:keys [username org name]} :params}
+       (log/info :revisions (str org "/" name) :username username)
        (check-pack username org name revisions))
   (POST "/buildpacks/:org/:name" {{:keys [username org name buildpack]} :params}
         (binding [*not-found* (partial create name)]
+          (log/info :update (str org "/" name) :username username)
           (check-pack username org name update (:tempfile buildpack))))
   (POST "/buildpacks/:org/:name/revisions/:target" {{:keys [username org name
                                                             target]} :params}
+        (log/info :rollback (str org "/" name) :to target :username username)
         (check-pack username org name rollback target))
   (POST "/buildpacks/:org/share/:email" {{:keys [username org email]} :params}
+        (log/info :share org :to email :from username)
         (check-org username org share email))
   (DELETE "/buildpacks/:org/share/:email" {{:keys [username org email]} :params}
+          (log/info :unshare org :to email :from username)
           (check-org username org unshare email)))
 
 ;; This is intended to be run by hand to make the s3 contents match the DB
