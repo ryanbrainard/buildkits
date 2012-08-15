@@ -12,6 +12,7 @@
             [compojure.route :as route]
             [compojure.handler :as handler]
             [clojure.java.jdbc :as sql]
+            [clojure.java.io :as io]
             [clojure.data.codec.base64 :as base64]
             [buildkits.db :as db]
             [buildkits.html :as html]
@@ -82,21 +83,39 @@
   (wrap-auth #'kit/app)
   (route/not-found "Not found"))
 
-(defn wrap-validation-exception [handler]
+(defn- accepts-html? [req]
+  (re-find #"html" (get (:headers req) "accept" "")))
+
+(defn wrap-exceptions [handler]
   (fn [req]
     (try
       (handler req)
+      ;; TODO: extract this into a library; this is silly
       (catch clojure.lang.ExceptionInfo e
-        {:status (:status (ex-data e) 400)
-         :headers {"Content-Type" "application/json"}
-         :body (json/encode (assoc (ex-data e) :message (.getMessage e)))}))))
+        (if (accepts-html? req)
+          {:status (:status (ex-data e) 400)
+           :headers {"Content-Type" "text/html"}
+           :body (slurp (io/resource (if (= (:status (ex-data e)) 404)
+                                       "404.html"
+                                       "500.html")))}
+          {:status (:status (ex-data e) 400)
+           :headers {"Content-Type" "application/json"}
+           :body (json/encode (assoc (ex-data e) :message (.getMessage e)))}))
+      (catch Exception e
+        (if (accepts-html? req)
+          {:status 500
+           :headers {"Content-Type" "text/html"}
+           :body (slurp (io/resource "500.html"))}
+          {:status 500
+           :headers {"Content-Type" "application/json"}
+           :body (json/encode {:message (.getMessage e)})})))))
 
 (defn -main [& [port]]
   (let [port (Integer. (or port (env/env :port) 5000))
         store (cookie/cookie-store {:key (env/env :session-secret)})]
     (jetty/run-jetty (-> #'app
                          (resource/wrap-resource "static")
-                         (wrap-validation-exception)
+                         (wrap-exceptions)
                          ((if (env/env :dev)
                             trace/wrap-stacktrace
                             noir/wrap-force-ssl))
