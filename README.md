@@ -58,6 +58,23 @@ For developing against a local app:
 
     $ export BUILDPACK_SERVER_URL=http://localhost:5000
 
+## Operational Activities
+
+Start with a production repl using `heroku run`:
+
+    $ heroku run lein repl
+
+If you configure a new bucket, you'll want to populate it from the DB:
+
+    user> (doto 'buildkits.buildpacks require in-ns)
+    buildkits.buildpack> (update-s3-tarballs)
+
+Transferring buildpacks to a different org is currently only exposed
+via the repl:
+
+    user> (doto 'buildkits.buildpacks require in-ns)
+    buildkits.buildpack> (transfer "heroku/emacs" "technomancy")
+
 ## License
 
 Copyright © 2012 Heroku, Inc.
