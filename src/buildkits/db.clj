@@ -20,14 +20,17 @@
   (merge (dissoc buildpack :attributes :organization_id)
          (:attributes buildpack)))
 
-(defn get-buildpack [org buildpack-name]
-  (sql/with-query-results [b] [(str "SELECT buildpacks.*, organizations.name as org"
-                                    "  FROM buildpacks, organizations"
-                                    " WHERE organizations.name = ?"
-                                    " AND buildpacks.name = ?")
-                               org buildpack-name]
-    (if b
-      (flatten (unhstore b)))))
+(defn get-buildpack
+  ([org-and-buildpack-name]
+     (apply get-buildpack (.split org-and-buildpack-name "/")))
+  ([org buildpack-name]
+     (sql/with-query-results [b] [(str "SELECT buildpacks.*, organizations.name as org"
+                                       "  FROM buildpacks, organizations"
+                                       " WHERE organizations.name = ?"
+                                       " AND buildpacks.name = ?")
+                                  org buildpack-name]
+       (if b
+         (flatten (unhstore b))))))
 
 (defn get-buildpacks []
   (sql/with-query-results buildpacks

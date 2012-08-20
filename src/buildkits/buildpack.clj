@@ -164,3 +164,13 @@
                                        organization_id]
           (update (get attributes "owner") (:name org)
                   {:name name :id id} tarball))))))
+
+(defn transfer [buildpack target-org]
+  (sql/with-connection db/db
+    (let [buildpack (if (map? buildpack)
+                      buildpack
+                      (db/get-buildpack org buildpack-name))]
+      (sql/with-query-results [org]
+        ["SELECT id FROM organizations WHERE name = ?" target-org]
+        (sql/update-values "buildpacks" ["id = ?" (:id buildpack)]
+                           {:organization_id (:id org))))))
