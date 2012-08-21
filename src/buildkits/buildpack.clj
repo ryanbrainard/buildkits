@@ -169,8 +169,8 @@
   (sql/with-connection db/db
     (let [buildpack (if (map? buildpack)
                       buildpack
-                      (db/get-buildpack org buildpack-name))]
+                      (db/get-buildpack buildpack))]
       (sql/with-query-results [org]
         ["SELECT id FROM organizations WHERE name = ?" target-org]
         (sql/update-values "buildpacks" ["id = ?" (:id buildpack)]
-                           {:organization_id (:id org))))))
+                           {:organization_id (:id org)})))))
