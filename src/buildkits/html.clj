@@ -38,6 +38,7 @@
                                                                (:name buildpack)))
                                   (toggle-form buildpack kit)))
                        [:a.tgz] (h/set-attr "href" (tar-link buildpack))
+                       ;; TODO: display who published latest revision
                        [:span.owner] (h/content (:owner buildpack))))))
 
 (h/deftemplate dashboard "index.html" [buildpacks username kit]

@@ -10,3 +10,12 @@ form.logged-in {
     float: left; 
     margin: -2.5em -5.5em;
 }
+
+tt {
+    font-family: monospace;
+}
+
+pre {
+    font-family: monospace;
+    margin: 1em 0;
+}
