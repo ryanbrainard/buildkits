@@ -37,7 +37,7 @@
     [(str "SELECT buildpacks.*, organizations.name as org"
           " FROM buildpacks, organizations"
           " WHERE buildpacks.organization_id = organizations.id"
-          " ORDER BY name")]
+          " ORDER BY organization_id, name")]
     (mapv (comp flatten unhstore) buildpacks)))
 
 (defn get-kit [name]
