@@ -86,6 +86,10 @@
             (log/info :remove-from-kit (str org "/" buildpack) :username username)
             (db/remove-from-kit username org buildpack))
           (res/redirect "/"))
+  (GET "/buildpacks" []
+       {:status 200 :headers {"content-type" "application/json"}
+        :body (sql/with-connection db/db
+                (json/encode (db/get-buildpacks)))})
   (wrap-auth #'buildpack/app)
   (wrap-auth #'kit/app)
   (route/not-found "Not found"))

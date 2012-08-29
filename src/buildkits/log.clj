@@ -31,7 +31,7 @@
        (map unparse1)
        (str/join " ")))
 
-(def *info* true)
+(def ^:dynamic *info* true)
 
 (defn info [& data]
   (when *info*

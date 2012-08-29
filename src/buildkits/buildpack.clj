@@ -127,10 +127,6 @@
     (apply check-org username org pack-callback args)))
 
 (defroutes app
-  (GET "/buildpacks" []
-       {:status 200 :headers {"content-type" "application/json"}
-        :body (sql/with-connection db/db
-                (json/encode (db/get-buildpacks)))})
   (GET "/buildpacks/:org/:name/revisions" {{:keys [username org name]} :params}
        (log/info :revisions (str org "/" name) :username username)
        (check-pack username org name revisions))
