@@ -31,14 +31,20 @@
   (let [{:keys [id]} (sql/insert-record "organizations" {:name org})]
     (sql/insert-record "memberships" {:email username :organization_id id})))
 
+(defn rev-path [org name revision]
+  (format "buildpacks/%s/%s-v%s.tgz" org name revision))
+
+(defn rev-link [org name revision]
+  (format "http://%s.s3.amazonaws.com/%s"
+          (env/env :aws-bucket) (rev-path org name revision)))
+
 (defn s3-put [org buildpack-name content revision]
   (when-let [access_key (env/env :aws-access-key)]
     (let [s3 (RestS3Service. (AWSCredentials. access_key
                                               (env/env :aws-secret-key)))
           bucket (env/env :aws-bucket)
           key (format "buildpacks/%s/%s.tgz" org buildpack-name)
-          revision-key (format "buildpacks/%s/%s-v%s.tgz" org
-                               buildpack-name revision)
+          revision-key (rev-path org buildpack-name revision)
           obj (doto (S3Object. key content)
                 (.setAcl (AccessControlList/REST_CANNED_PUBLIC_READ)))
           revision-obj (doto (S3Object. revision-key content)
@@ -85,7 +91,11 @@
                                      " FROM revisions"
                                      " WHERE buildpack_id = ? ORDER BY id")
                                 (:id buildpack)]
-    {:status 200 :body (json/encode revs)}))
+    {:status 200 :body (json/encode (for [rev revs]
+                                      (assoc rev :tar_link
+                                             (rev-link (:org buildpack)
+                                                       (:name buildpack)
+                                                       (:id rev)))))}))
 
 (defn share [_ org email]
   (sql/with-query-results [{:keys [id]}]
