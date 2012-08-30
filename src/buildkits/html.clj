@@ -21,10 +21,6 @@
             [[:input (h/attr= :name "_method")]] (h/set-attr "value" method)
             [[:input (h/attr= :type "submit")]] (h/set-attr "value" label)))))
 
-(defn tar-link [{:keys [org name]}]
-  (format "http://%s.s3.amazonaws.com/buildpacks/%s/%s.tgz"
-          (env/env :aws-bucket) org name))
-
 (defn buildpack-list [buildpacks kit]
   (h/clone-for [buildpack buildpacks]
                (fn [li]
@@ -37,7 +33,7 @@
                                                                (:org buildpack)
                                                                (:name buildpack)))
                                   (toggle-form buildpack kit)))
-                       [:a.tgz] (h/set-attr "href" (tar-link buildpack))
+                       [:a.tgz] (h/set-attr "href" (:tar_link buildpack))
                        ;; TODO: display who published latest revision
                        [:span.owner] (h/content (:owner buildpack))))))
 

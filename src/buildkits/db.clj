@@ -30,7 +30,9 @@
                                        " AND buildpacks.name = ?")
                                   org buildpack-name]
        (if b
-         (flatten (unhstore b))))))
+         (assoc (flatten (unhstore b))
+           :tar_link (format "http://%s.s3.amazonaws.com/buildpacks/%s/%s.tgz"
+                             (env/env :aws-bucket) org buildpack-name))))))
 
 (defn get-buildpacks []
   (sql/with-query-results buildpacks
