@@ -75,7 +75,7 @@
       (update username org buildpack (:tarball rev))
       {:status 404})))
 
-(defn revisions [_ _ buildpack]
+(defn revisions [buildpack]
   (sql/with-query-results revs [(str "SELECT id, published_by, created_at"
                                      " FROM revisions"
                                      " WHERE buildpack_id = ? ORDER BY id")
@@ -126,14 +126,23 @@
                           (apply *not-found* username org args)))]
     (apply check-org username org pack-callback args)))
 
-(defroutes app
+(defroutes public-app
+  (GET "/buildpacks" []
+       {:status 200 :headers {"content-type" "application/json"}
+        :body (sql/with-connection db/db
+                (json/encode (db/get-buildpacks)))})
   (GET "/buildpacks/:org/:name" {{:keys [org name]} :params}
        {:status 200 :headers {"Content-Type" "application/json"}
         :body (sql/with-connection db/db
                 (json/encode (db/get-buildpack org name)))})
-  (GET "/buildpacks/:org/:name/revisions" {{:keys [username org name]} :params}
-       (log/info :revisions (str org "/" name) :username username)
-       (check-pack username org name revisions))
+  (GET "/buildpacks/:org/:name/revisions" {{:keys [org name]} :params}
+       (log/info :revisions (str org "/" name))
+       (sql/with-connection db/db
+         (if-let [pack (db/get-buildpack org name)]
+           (revisions pack)
+           (*not-found*)))))
+
+(defroutes edit-app
   (POST "/buildpacks/:org/:name" {{:keys [username org name buildpack]} :params}
         (binding [*not-found* (partial create name)]
           (log/info :update (str org "/" name) :username username)
