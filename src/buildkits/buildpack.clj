@@ -37,8 +37,8 @@
                                               (env/env :aws-secret-key)))
           bucket (env/env :aws-bucket)
           key (format "buildpacks/%s/%s.tgz" org buildpack-name)
-          revision-key key (format "buildpacks/%s/%s-v%s.tgz" org
-                                   buildpack-name revision)
+          revision-key (format "buildpacks/%s/%s-v%s.tgz" org
+                               buildpack-name revision)
           obj (doto (S3Object. key content)
                 (.setAcl (AccessControlList/REST_CANNED_PUBLIC_READ)))
           revision-obj (doto (S3Object. revision-key content)
