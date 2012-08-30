@@ -31,14 +31,19 @@
   (let [{:keys [id]} (sql/insert-record "organizations" {:name org})]
     (sql/insert-record "memberships" {:email username :organization_id id})))
 
-(defn s3-put [org buildpack-name content]
+(defn s3-put [org buildpack-name content revision]
   (when-let [access_key (env/env :aws-access-key)]
     (let [s3 (RestS3Service. (AWSCredentials. access_key
                                               (env/env :aws-secret-key)))
           bucket (env/env :aws-bucket)
           key (format "buildpacks/%s/%s.tgz" org buildpack-name)
+          revision-key key (format "buildpacks/%s/%s-v%s.tgz" org
+                                   buildpack-name revision)
           obj (doto (S3Object. key content)
+                (.setAcl (AccessControlList/REST_CANNED_PUBLIC_READ)))
+          revision-obj (doto (S3Object. revision-key content)
                 (.setAcl (AccessControlList/REST_CANNED_PUBLIC_READ)))]
+      (.putObject s3 bucket revision-obj)
       (.putObject s3 bucket obj))))
 
 ;; why is this not in clojure.java.io?
@@ -52,14 +57,14 @@
 (defn create [buildpack-name username org content]
   (let [bytes (get-bytes content)
         rev-id (db/create username org buildpack-name bytes)]
-    (s3-put org buildpack-name bytes)
+    (s3-put org buildpack-name bytes rev-id)
     {:status 201 :body (json/encode {:revision rev-id})}))
 
 (defn update [username org buildpack content]
   (println "Updating" org buildpack "by" username)
   (let [bytes (get-bytes content)
         rev-id (db/update username (:id buildpack) bytes)]
-    (s3-put org (:name buildpack) bytes)
+    (s3-put org (:name buildpack) bytes rev-id)
     {:status 200 :body (json/encode {:revision rev-id})}))
 
 (defn- rollback-query [org buildpack-id target]
