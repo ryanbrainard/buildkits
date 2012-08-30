@@ -43,13 +43,11 @@
     (let [s3 (RestS3Service. (AWSCredentials. access_key
                                               (env/env :aws-secret-key)))
           bucket (env/env :aws-bucket)
-          key (format "buildpacks/%s/%s.tgz" org buildpack-name)
-          revision-key (rev-path org buildpack-name revision)
+          key (if revision
+                (rev-path org buildpack-name revision)
+                (format "buildpacks/%s/%s.tgz" org buildpack-name))
           obj (doto (S3Object. key content)
-                (.setAcl (AccessControlList/REST_CANNED_PUBLIC_READ)))
-          revision-obj (doto (S3Object. revision-key content)
                 (.setAcl (AccessControlList/REST_CANNED_PUBLIC_READ)))]
-      (.putObject s3 bucket revision-obj)
       (.putObject s3 bucket obj))))
 
 ;; why is this not in clojure.java.io?
@@ -63,6 +61,7 @@
 (defn create [buildpack-name username org content]
   (let [bytes (get-bytes content)
         rev-id (db/create username org buildpack-name bytes)]
+    (s3-put org buildpack-name bytes nil) ; upload as latest too
     (s3-put org buildpack-name bytes rev-id)
     {:status 201 :body (json/encode {:revision rev-id})}))
 
@@ -70,6 +69,7 @@
   (println "Updating" org buildpack "by" username)
   (let [bytes (get-bytes content)
         rev-id (db/update username (:id buildpack) bytes)]
+    (s3-put org (:name buildpack) bytes nil)
     (s3-put org (:name buildpack) bytes rev-id)
     {:status 200 :body (json/encode {:revision rev-id})}))
 
@@ -177,17 +177,19 @@
 (defn update-s3-tarballs []
   (sql/with-connection db/db
     (sql/with-query-results revisions
-      [(str "SELECT buildpacks.*, revisions.tarball"
-            " FROM buildpacks, revisions"
+      [(str "SELECT buildpacks.*, revisions.tarball, revisions.id AS rev,"
+            " organizations.name AS org"
+            " FROM buildpacks, revisions, organizations"
             " WHERE revisions.buildpack_id = buildpacks.id"
-            " AND revisions.id IN "
-            " (SELECT MAX(revisions.id) FROM revisions"
-            "   GROUP BY buildpack_id);")]
-      (doseq [{:keys [tarball organization_id name id attributes]} revisions]
-        (sql/with-query-results [org] ["SELECT name FROM organizations WHERE id = ?"
-                                       organization_id]
-          (update (get attributes "owner") (:name org)
-                  {:name name :id id} tarball))))))
+            " AND organizations.id = buildpacks.organization_id")]
+      (doseq [{:keys [tarball org name id attributes rev]} revisions]
+          (println "Uploading version" rev "of" org "/" name)
+          (s3-put org name (get-bytes tarball) rev))
+      (doseq [[name pack-revs] (group-by :name revisions)
+              :let [latest (last (sort-by :rev pack-revs))
+                    {:keys [tarball org name id attributes rev]} latest]]
+        (println "Uploading latest rev of" org "/" name)
+        (s3-put org name (get-bytes tarball) nil)))))
 
 (defn transfer [buildpack target-org]
   (sql/with-connection db/db
