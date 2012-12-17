@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# fail fast
+set -o errexit
+set -o pipefail
+
 compile_dir=$1
 cache_dir=$2
 
